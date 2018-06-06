@@ -25,7 +25,6 @@ from mpi4py import MPI
 import os,sys
 from astropy.table import Table , Column ,vstack ,hstack
 from common_functions import *
-yt.enable_parallelism()
 
 sl_left = slice(None, -2, None)
 sl_right = slice(2, None, None)
@@ -338,6 +337,7 @@ def Vorticity_profile(V,R,DR,Rmin,Rmax,function):
     return x,y
 
 def Quantities(ds,xo,yo,ls,Resolution,error):
+    print(id)
     Result=[]
     Disk = ds.disk([xo,yo,0.5], [0., 0., 1.],(0.5*ls/1000.0, 'kpc'), (1, 'kpc'))
     gas_mass=Disk['cell_mass'].in_units('Msun')
@@ -586,6 +586,10 @@ def Quantities(ds,xo,yo,ls,Resolution,error):
 
     return Result
 
+comm = MPI.COMM_WORLD
+ncores = comm.Get_size()
+id = comm.Get_rank()
+
 cmdargs = sys.argv
 
 data=cmdargs[-7]
@@ -712,10 +716,16 @@ for scale in scales:
 
     print('        Number of regions :%d\t     \n' %len(xcm))
 
-    for xo,yo in zip(xcm[2:],ycm[2:]):
-        Resultado=Quantities(ds,xo,yo,ls,Resolution,error)
-        print(Resultado)
+    part=int(len(xcm)/ncores)+1
 
+    xpart=xcm[id*part:(id+1)*part]
+    ypart=ycm[id*part:(id+1)*part]
+
+    if len(xpart)>0:
+        for xo,yo in zip(xpart,ypart):
+            Resultado=Quantities(ds,xo,yo,ls,Resolution,error)
+            print(Resultado)
+"""
     name_table='Files/'+data+'_multi_resolution'
     if os.path_is_file(name_table):
         print('File exists')
@@ -723,3 +733,4 @@ for scale in scales:
         tabla=Table()
         tabla.write(name_table,format='hdf5',serialize_meta=True,overwrite=True)
         del tabla
+"""
