@@ -459,6 +459,7 @@ def Quantities(ds,xo,yo,ls,Resolution,error):
     nu_new_stars=np.sqrt(np.pi*G*new_stellar_density/Zs).in_units('1/Myr')
     if (number_stars < 10)or(Zs<1):
         nu_new_stars*=0.0
+    nu_new_stars[np.isnan(nu_new_stars)]=0.0
     del star_vz,star_vz2,star_z,star_z2
 
     surface_density=surface_density[good_data]
@@ -523,10 +524,6 @@ def Quantities(ds,xo,yo,ls,Resolution,error):
     Result.append(np.average(omega,weights=surface_density))
     Result.append(np.average(vorticity))
     Result.append(np.average(vorticity,weights=surface_density))
-    Result.append(np.average(omega))
-    Result.append(np.average(omega,weights=surface_density))
-    Result.append(np.average(vorticity))
-    Result.append(np.average(vorticity,weights=surface_density))
     Result.append(np.average(average_omega))
     Result.append(np.average(average_omega,weights=surface_density))
     Result.append(np.average(average_vorticity))
@@ -586,6 +583,42 @@ def Quantities(ds,xo,yo,ls,Resolution,error):
 
     return Result
 
+def result_table(Resultados):
+
+    Row=[]
+    for res in Resultados:
+        Row.append([res])
+    Columns=['scale','gas_mass','molecular_gas_mass','star_mass','star_formation','surface_density','surface_density_w','molecular_surface_density',  #7
+        'molecular_surface_density_w','new_stellar_density','new_stellar_density_w','sigma_vel','sigma_vel_w','star_sigma','v_diff', #7 (14)
+    'v_diff_w','v_turb','v_turb_w','sound_speed','sound_speed_w','gas_H','gas_H_w','Zg','Zg_w','Zs','nu_gas','nu_gas_w','nu_star', #13 (27)
+    'nu_star_w','nu_new_stars','nu_new_stars_w','nu_dm','nu_dm_w','galaxy_radius','omega','omega_w','vorticity','vorticity_w',     #10 (37)
+    'average_omega','average_omega_w','average_vorticity','average_vorticity_w','omega_star','omega_star_w',                       #6 (43)
+    'omega_dm','omega_dm_w','kappa_star','kappa_star_w','kappa_dm','kappa_dm_w','Iz','Lz','rot','L1','L2','L3','L4','L5','L6','L1_w','L2_w','L3_w',  #18(61)
+    'L4_w','L5_w','L6_w','Mach_1','Mach_2','Mach_3','Mach_1_w','Mach_2_w','Mach_3_w','tcross_1','tcross_2','tcross_3','tcross_4','tcross_5',     #14 (75)
+    'tcross_6','tcross_1_w','tcross_2_w','tcross_3_w','tcross_4_w','tcross_5_w','tcross_6_w','t_gas','t_tot','t_gas_w','t_tot_w','v11', #17  (92)
+    'v22','v33','k11','k22','k33']
+    print('Largos')
+    print(len(Row),len(Columns))
+    tab = Table(Row, names=Columns)
+    return tab
+
+def create_table(name_table):
+    Columns=['scale','gas_mass','molecular_gas_mass','star_mass','star_formation','surface_density','surface_density_w','molecular_surface_density',  #7
+        'molecular_surface_density_w','new_stellar_density','new_stellar_density_w','sigma_vel','sigma_vel_w','star_sigma','v_diff', #7 (14)
+    'v_diff_w','v_turb','v_turb_w','sound_speed','sound_speed_w','gas_H','gas_H_w','Zg','Zg_w','Zs','nu_gas','nu_gas_w','nu_star', #13 (27)
+    'nu_star_w','nu_new_stars','nu_new_stars_w','nu_dm','nu_dm_w','galaxy_radius','omega','omega_w','vorticity','vorticity_w',     #10 (37)
+    'average_omega','average_omega_w','average_vorticity','average_vorticity_w','omega_star','omega_star_w',                       #6 (43)
+    'omega_dm','omega_dm_w','kappa_star','kappa_star_w','kappa_dm','kappa_dm_w','Iz','Lz','rot','L1','L2','L3','L4','L5','L6','L1_w','L2_w','L3_w',  #18(61)
+    'L4_w','L5_w','L6_w','Mach_1','Mach_2','Mach_3','Mach_1_w','Mach_2_w','Mach_3_w','tcross_1','tcross_2','tcross_3','tcross_4','tcross_5',     #14 (75)
+    'tcross_6','tcross_1_w','tcross_2_w','tcross_3_w','tcross_4_w','tcross_5_w','tcross_6_w','t_gas','t_tot','t_gas_w','t_tot_w','v11', #17  (92)
+    'v22','v33','k11','k22','k33']
+    tabla=Table()
+    for col in Columns:
+        tabla[col]=Column()
+    tabla.write(name_table,path='data',format='hdf5',serialize_meta=True)
+    del tabla
+    return 0
+
 comm = MPI.COMM_WORLD
 ncores = comm.Get_size()
 id = comm.Get_rank()
@@ -601,6 +634,16 @@ Nscales=int(cmdargs[-2])
 Resolution=float(cmdargs[-1])
 print(data)
 simulation=data+"/G-"+data[-4:]
+
+name_table='Files/'+data+'_multi_resolution'
+
+if id==0:
+    if os.path.isfile(name_table):
+        print('table file exists')
+    else:
+        create_table(name_table)
+        print('table file created')
+
 
 ds=yt.load('../Circulation/Sims/'+simulation)
 
@@ -724,13 +767,10 @@ for scale in scales:
     if len(xpart)>0:
         for xo,yo in zip(xpart,ypart):
             Resultado=Quantities(ds,xo,yo,ls,Resolution,error)
-            print(Resultado)
-"""
-    name_table='Files/'+data+'_multi_resolution'
-    if os.path_is_file(name_table):
-        print('File exists')
-    else:
-        tabla=Table()
-        tabla.write(name_table,format='hdf5',serialize_meta=True,overwrite=True)
-        del tabla
-"""
+
+            new_tabla=result_table(Resultado)
+            tabla=Table.read(name_table,path='data',format='hdf5')
+
+            new_tabla=vstack([tabla,new_tabla])
+            new_tabla.write(name_table,path='data',format='hdf5',serialize_meta=True,overwrite=True)
+            del tabla
